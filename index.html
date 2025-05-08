@@ -5,22 +5,78 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>LightRAG Query Viewer</title>
   <style>
-    body { background: #eef6f7; color: #333; font-family: 'Segoe UI', sans-serif; padding: 20px; }
-    h1 { color: #055a5e; margin-bottom: 20px; }
-    .controls { margin-bottom: 20px; }
-    input[type="text"] { padding: 10px; width: 60%; border: 1px solid #aac4c1; border-radius: 4px; margin-right: 10px; }
-    button { padding: 10px 20px; border: none; border-radius: 4px; background: #0a7f82; color: white; cursor: pointer; font-size: 1rem; transition: background 0.2s; margin-right: 5px; }
-    button:disabled { background: #8fc1be; cursor: not-allowed; }
-    button:hover:not(:disabled) { background: #075d5f; }
-    #status { font-size: 1.1rem; margin-left: 10px; vertical-align: middle; }
-    .mode-buttons { margin-bottom: 20px; display: none; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
-    th { background: #aac4c1; color: #003434; }
-    tr:nth-child(even) { background: #f6fafa; }
-    pre { background: #e0d6a6; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; }
-    .answer-section { background: #d3f1f2; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-    .context-table pre { margin:0; background: none; padding:0; }
+    body {
+      background: #eef6f7;
+      color: #333;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      color: #055a5e;
+      margin-bottom: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 60%;
+      border: 1px solid #aac4c1;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background: #0a7f82;
+      color: white;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+    button:disabled {
+      background: #8fc1be;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background: #075d5f;
+    }
+    #status {
+      font-size: 1.1rem;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    .mode-buttons {
+      margin-bottom: 20px;
+      display: none;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background: #aac4c1;
+      color: #003434;
+    }
+    tr:nth-child(even) {
+      background: #f6fafa;
+    }
+    pre {
+      background: #e0d6a6;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -35,7 +91,6 @@
     <button id="btn-local" disabled>Local</button>
     <button id="btn-mix" disabled>Mix</button>
     <button id="btn-hybrid" disabled>Hybrid</button>
-    <button id="btn-naive" disabled>Naive</button>
   </div>
 
   <div id="content">
@@ -52,18 +107,26 @@
     });
 
     async function runQuery(question) {
+      // Reset UI for new query
       apiData = null;
       document.getElementById('status').textContent = '';
       document.querySelector('.mode-buttons').style.display = 'none';
       document.getElementById('content').innerHTML = '<p>Waiting for response…</p>';
       document.getElementById('btn-query').disabled = true;
+
       try {
         document.getElementById('status').textContent = '⏳ Fetching…';
-        const resp = await fetch(API_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
+        const resp = await fetch(API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question })
+        });
         apiData = await resp.json();
         document.getElementById('status').textContent = '✅ Answer received';
+        // Show and enable mode buttons
         document.querySelector('.mode-buttons').style.display = 'block';
         document.querySelectorAll('.mode-buttons button').forEach(b => b.disabled = false);
+        // Automatically show Local mode
         showMode('local');
       } catch (err) {
         console.error(err);
@@ -77,33 +140,33 @@
     function parseSections(raw) {
       const sec = {};
       const extractJson = label => {
-        const re = new RegExp(`-----${label}-----[\\s\\S]*?\\`\\`\\`json\\n([\\s\\S]*?)\\`\\`\\``);
+        const re = new RegExp(`-----${label}-----[\\s\\S]*?\\\`\\\`\\\`json\\n([\\s\\S]*?)\\\`\\\`\\\``);
         const m = raw.match(re);
         return m ? JSON.parse(m[1]) : [];
       };
       sec.entities = extractJson('Entities');
       sec.relationships = extractJson('Relationships');
       sec.sources = extractJson('Sources');
-      if (raw.includes('-----Vector Context-----')) sec.vector = raw.split('-----Vector Context-----')[1].trim();
+      if (raw.includes('-----Vector Context-----')) {
+        sec.vector = raw.split('-----Vector Context-----')[1].trim();
+      }
       return sec;
-    }
-
-    function showContextTable(context) {
-      let html = '<h3>Context</h3><table class="context-table"><thead><tr><th>File Path</th><th>Chunk</th></tr></thead><tbody>';
-      context.split('--New Chunk--').map(c => c.trim()).filter(c => c).forEach(chunk => {
-        const lines = chunk.split('\n').filter(l => l);
-        const pathLine = lines.find(l => l.startsWith('File path:'))||'';
-        const filePath = pathLine.replace('File path:','').trim();
-        const content = lines.filter(l=> !l.startsWith('File path:')).join('\n');
-        html += `<tr><td>${filePath}</td><td><pre>${content}</pre></td></tr>`;
-      });
-      html += '</tbody></table>';
-      return html;
     }
 
     function renderTable(data, cols) {
       if (!data.length) return '<p>No items.</p>';
-      let html = '<table><thead><tr>' + cols.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>' + data.map(item => '<tr>' + cols.map(c=>`<td>${item[c.toLowerCase()]||''}</td>`).join('')+'</tr>').join('') + '</tbody></table>';
+      let html = '<table><thead><tr>';
+      cols.forEach(c => html += `<th>${c}</th>`);
+      html += '</tr></thead><tbody>';
+      data.forEach(item => {
+        html += '<tr>';
+        cols.forEach(c => {
+          const key = c.toLowerCase();
+          html += `<td>${item[key] ?? ''}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
       return html;
     }
 
@@ -112,20 +175,47 @@
       const raw = apiData[mode].context;
       const answer = apiData[mode].answer;
       const s = parseSections(raw);
-      let html = `<div class="answer-section"><h3>Answer</h3><pre>${answer}</pre></div>`;
-      html += showContextTable(raw);
-      if (mode !== 'naive') {
-        html += `<h2 style="color:#055a5e;margin-top:20px;">${mode.charAt(0).toUpperCase()+mode.slice(1)} Mode</h2>`;
-        html += '<h3>Entities</h3>' + renderTable(s.entities,['ID','Entity','Type','Description','Rank','File_path']);
-        html += '<h3>Relationships</h3>' + renderTable(s.relationships,['ID','Source','Target','Description','Keywords','Weight','Rank','File_path']);
-        html += '<h3>Sources</h3>' + renderTable(s.sources,['ID','Content','File_path']);
+
+      // Clean up relationship keywords (keep only text after '|>')
+      s.relationships = s.relationships.map(rel => {
+        const parts = rel.description.split('|>');
+        return {
+          ...rel,
+          description: parts[0].trim(),
+          keywords: parts[1] ? parts[1].trim() : ''
+        };
+      });
+
+      let html = `<h3 style="color:#0a7f82;">Answer</h3><pre>${answer}</pre>`;
+      html += `<h2 style="color:#055a5e;">${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode</h2>`;
+      html += '<h3>Entities</h3>' +
+        renderTable(s.entities, ['ID','Entity','Type','Description','Rank','File_path']);
+      html += '<h3>Relationships</h3>' +
+        renderTable(s.relationships, ['ID','Source','Target','Description','Keywords','Weight','Rank','File_path']);
+      html += '<h3>Sources</h3>' +
+        renderTable(s.sources, ['ID','Content','File_path']);
+
+      if (mode === 'mix' && s.vector) {
+        html += '<h3>Vector Context</h3><table><tbody>';
+        const chunks = s.vector.split(/--New Chunk--/).map(c => c.trim()).filter(c => c);
+        chunks.forEach(chunk => {
+          const lines = chunk.split('\n').filter(l => l);
+          const filePath = lines[1].replace('File path:','').trim();
+          const content = lines.slice(2).join('\n');
+          html += '<tr>';
+          html += `<td>File path: ${filePath}</td>`;
+          html += `<td><pre>${content}</pre></td>`;
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
       }
+
       document.getElementById('content').innerHTML = html;
     }
 
-    ['local','mix','hybrid','naive'].forEach(mode => {
-      document.getElementById(`btn-${mode}`).addEventListener('click', () => showMode(mode));
-    });
+    document.getElementById('btn-local').addEventListener('click', () => showMode('local'));
+    document.getElementById('btn-mix').addEventListener('click', () => showMode('mix'));
+    document.getElementById('btn-hybrid').addEventListener('click', () => showMode('hybrid'));
   </script>
 </body>
 </html>
