@@ -20,7 +20,6 @@
     tr:nth-child(even) { background: #f6fafa; }
     pre { background: #e0d6a6; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; }
     .answer-section { background: #d3f1f2; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-    .context-table pre { margin:0; background: none; padding:0; }
   </style>
 </head>
 <body>
@@ -43,7 +42,7 @@
   </div>
 
   <script>
-    const API_ENDPOINT = 'https://modal8350--custom-lightrag-app-1-serve.modal.run';
+    const API_ENDPOINT = 'https://modal8350--custom-lightrag-app-serve.modal.run/ask';
     let apiData = null;
 
     document.getElementById('btn-query').addEventListener('click', () => {
@@ -77,7 +76,7 @@
     function parseSections(raw) {
       const sec = {};
       const extractJson = label => {
-        const re = new RegExp(`-----${label}-----[\\s\\S]*?\\`\\`\\`json\\n([\\s\\S]*?)\\`\\`\\``);
+        const re = new RegExp(`-----${label}-----[\s\S]*?\`\`\`json\n([\s\S]*?)\`\`\``);
         const m = raw.match(re);
         return m ? JSON.parse(m[1]) : [];
       };
@@ -88,9 +87,9 @@
       return sec;
     }
 
-    function showContextTable(rawContext) {
-      let html = '<h3>Context</h3><table class="context-table"><thead><tr><th>File Path</th><th>Chunk</th></tr></thead><tbody>';
-      rawContext.split('--New Chunk--').map(c => c.trim()).filter(c => c).forEach(chunk => {
+    function showContextTable(raw) {
+      let html = '<h3>Context</h3><table><thead><tr><th>File Path</th><th>Chunk</th></tr></thead><tbody>';
+      raw.split('--New Chunk--').map(c => c.trim()).filter(c => c).forEach(chunk => {
         const lines = chunk.split('\n').filter(l => l);
         const pathLine = lines.find(l => l.startsWith('File path:')) || '';
         const filePath = pathLine.replace('File path:','').trim();
